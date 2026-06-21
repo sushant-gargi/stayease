@@ -204,14 +204,14 @@ All endpoints are prefixed with `/api/v1`.
 ### 1. Clone & Configure
 
 ```bash
-git clone https://github.com/sushant-gargi/stayease
+git clone https://github.com/sushant-gargi/stayease.git
 cd airBnbApp
 ```
 
 Create `src/main/resources/application.properties`:
 
 ```properties
-spring.application.name=airBnbApp
+spring.application.name=StayEase
 
 # Database
 spring.datasource.url=jdbc:postgresql://localhost:5432/airbnb
