@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-336791?style=flat&logo=postgresql&logoColor=white" />
   <img src="https://img.shields.io/badge/Stripe-635BFF?style=flat&logo=stripe&logoColor=white" />
   <img src="https://img.shields.io/badge/JWT-Auth-black?style=flat&logo=jsonwebtokens" />
-  <img src="https://img.shields.io/badge/License-Educational-blue?style=flat" />
+  <img src="https://img.shields.io/badge/Concurrency-Pessimistic%20Locking-red?style=flat" />
 </p>
 
 <p align="center">
@@ -27,11 +27,42 @@
 
 ---
 
+## 🎯 Production Engineering Highlights
+
+✔ High-Concurrency Booking Workflows using Pessimistic Locking
+
+✔ Dynamic Pricing Engine using Strategy + Decorator Design Patterns
+
+✔ Stripe Payment Orchestration with Webhook-Driven Booking Confirmation
+
+✔ JWT-Based Authentication and Role-Based Authorization
+
+✔ PostgreSQL Optimization using JPQL Queries and Aggregations
+
+✔ Layered Spring Boot Architecture following Clean Separation of Concerns
+
+---
+
+A **production-grade hospitality reservation** platform built using Spring Boot, designed to handle secure bookings, inventory management, dynamic pricing, payment processing, and hotel operations at scale.
+
+This project goes beyond a CRUD API. It implements **inventory management**, **pessimistic locking for concurrent bookings**, **Stripe checkout with webhook-driven confirmation**, and a **Strategy Pattern-based dynamic pricing engine** — the kind of patterns used in production booking systems.
+
+
 A **production-grade hospitality reservation** platform built using Spring Boot, designed to handle secure bookings, inventory management, dynamic pricing, payment processing, and hotel operations at scale.
 
 This project goes beyond a CRUD API. It implements **inventory management**, **pessimistic locking for concurrent bookings**, **Stripe checkout with webhook-driven confirmation**, and a **Strategy Pattern-based dynamic pricing engine** — the kind of patterns used in production booking systems.
 
 ---
+
+## 📊 System Scale & Engineering Considerations
+
+* 365-Day Inventory Pre-Generation for Every Room
+* Concurrent Booking Protection using Database-Level Pessimistic Locking
+* Hourly Dynamic Pricing Recalculation via Scheduled Batch Processing
+* Stripe Webhook-Driven Booking Confirmation Workflow
+* Multi-Role Access Control (Guest & Hotel Manager)
+* Aggregated Hotel Search Optimization using Precomputed Pricing Tables
+
 
 ## 🏛 Enterprise Architecture
 
@@ -205,7 +236,7 @@ All endpoints are prefixed with `/api/v1`.
 
 ```bash
 git clone https://github.com/sushant-gargi/stayease.git
-cd airBnbApp
+cd stayease
 ```
 
 Create `src/main/resources/application.properties`:
@@ -291,7 +322,7 @@ User ──< Booking >── Hotel
 
 ---
 
-## 🎯 Backend Engineering Competencies Demonstrated
+## 🎯 Production Engineering Concepts Demonstrated
 
 - Designing a **multi-role REST API** with fine-grained authorization
 - Implementing **pessimistic database locking** for high-concurrency scenarios
