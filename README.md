@@ -204,7 +204,7 @@ All endpoints are prefixed with `/api/v1`.
 ### 1. Clone & Configure
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/sushant-gargi/stayease
 cd airBnbApp
 ```
 
