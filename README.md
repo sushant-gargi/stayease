@@ -1,9 +1,9 @@
 <p align="center">
-  <h1 align="center">🏨 AirBnB Clone — Backend API</h1>
+  <h1 align="center">🏨 StayEase </h1>
   <p align="center">
-    <strong>A production-grade hotel booking platform built with Spring Boot</strong>
+    <strong>High-Concurrency Hospitality & Reservation Management Platform</strong>
     <br/>
-    <sub>JWT Auth · Dynamic Pricing Engine · Stripe Payments · Role-Based Access · PostgreSQL</sub>
+    <sub>JWT Security · Dynamic Pricing · Inventory Management · Stripe Payments · Revenue Analytics · PostgreSQL</sub>
   </p>
 </p>
 
@@ -27,13 +27,13 @@
 
 ---
 
-A **full-featured hotel booking backend** inspired by AirBnB, designed to demonstrate real-world backend engineering skills — secure authentication, dynamic pricing algorithms, payment integration, and clean layered architecture.
+A **production-grade hospitality reservation** platform built using Spring Boot, designed to handle secure bookings, inventory management, dynamic pricing, payment processing, and hotel operations at scale.
 
 This project goes beyond a CRUD API. It implements **inventory management**, **pessimistic locking for concurrent bookings**, **Stripe checkout with webhook-driven confirmation**, and a **Strategy Pattern-based dynamic pricing engine** — the kind of patterns used in production booking systems.
 
 ---
 
-## 🏗 Architecture
+## 🏛 Enterprise Architecture
 
 ```
 src/main/java/com/codingshuttle/projects/airBnbApp/
@@ -56,7 +56,7 @@ The project follows **Controller → Service Interface → Service Impl → Repo
 
 ---
 
-## ✨ Features
+## 🚀 Core Engineering Highlights
 
 ### 🔐 Security & Authentication
 - **JWT access + refresh token** strategy — short-lived access tokens (10 min), long-lived refresh tokens (6 months) stored as HttpOnly cookies
@@ -126,7 +126,7 @@ Prices are recalculated **hourly** via a `@Scheduled` batch job (`PricingUpdateS
 
 ---
 
-## 🛠 Tech Stack
+## ⚙ Technology Stack
 
 | Layer | Technology |
 |---|---|
@@ -142,7 +142,7 @@ Prices are recalculated **hourly** via a `@Scheduled` batch job (`PricingUpdateS
 
 ---
 
-## 🔌 API Overview
+## 🌐 API Surface
 
 All endpoints are prefixed with `/api/v1`.
 
@@ -259,7 +259,7 @@ stripe listen --forward-to localhost:8080/api/v1/webhook/payment
 
 ---
 
-## 🧠 Design Highlights
+## ⚡ Engineering Highlights
 
 ### Pessimistic Locking for Concurrent Bookings
 Two users booking the same room simultaneously is handled with `PESSIMISTIC_WRITE` locks on the inventory rows during the booking transaction. The `initBooking` query atomically increments `reservedCount` only when availability checks pass — eliminating race conditions without application-level distributed locks.
@@ -275,7 +275,7 @@ Every response, success or error, is wrapped in `ApiResponse<T>` via a `Response
 
 ---
 
-## 📁 Key Entities
+## 🗄 Domain Model
 
 ```
 User ──< Booking >── Hotel
@@ -291,7 +291,7 @@ User ──< Booking >── Hotel
 
 ---
 
-## 🚀 What I Learned / Demonstrated
+## 🎯 Backend Engineering Competencies Demonstrated
 
 - Designing a **multi-role REST API** with fine-grained authorization
 - Implementing **pessimistic database locking** for high-concurrency scenarios
