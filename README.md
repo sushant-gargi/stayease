@@ -1,9 +1,9 @@
 <p align="center">
-  <h1 align="center">🏨 StayEase </h1>
+  <h1 align="center">🏨 StayEase</h1>
   <p align="center">
-    <strong>High-Concurrency Hospitality & Reservation Management Platform</strong>
+    <strong>Hospitality & Reservation Management Backend</strong>
     <br/>
-    <sub>JWT Security · Dynamic Pricing · Inventory Management · Stripe Payments · Revenue Analytics · PostgreSQL</sub>
+    <sub>JWT Auth · Role-Based Access · Dynamic Pricing Engine · Stripe Payments · Revenue Analytics · PostgreSQL</sub>
   </p>
 </p>
 
@@ -13,151 +13,229 @@
   <img src="https://img.shields.io/badge/PostgreSQL-336791?style=flat&logo=postgresql&logoColor=white" />
   <img src="https://img.shields.io/badge/Stripe-635BFF?style=flat&logo=stripe&logoColor=white" />
   <img src="https://img.shields.io/badge/JWT-Auth-black?style=flat&logo=jsonwebtokens" />
-  <img src="https://img.shields.io/badge/Concurrency-Pessimistic%20Locking-red?style=flat" />
+  <img src="https://img.shields.io/badge/License-Educational-blue?style=flat" />
 </p>
 
 <p align="center">
   <a href="#-architecture">Architecture</a> ·
   <a href="#-features">Features</a> ·
-  <a href="#-tech-stack">Tech Stack</a> ·
-  <a href="#-api-overview">API Overview</a> ·
+  <a href="#-api-reference">API Reference</a> ·
   <a href="#-quick-start">Quick Start</a> ·
-  <a href="#-design-highlights">Design Highlights</a>
+  <a href="#-design-decisions">Design Decisions</a> ·
+  <a href="#-known-gaps">Known Gaps</a>
 </p>
 
 ---
 
-## 🎯 Production Engineering Highlights
+A Spring Boot backend for a hotel booking platform — built to practise production patterns rather than ship to production. It covers the full lifecycle of a reservation: hotel and room setup, real-time availability search, multi-step booking with guest management, Stripe-powered checkout with webhook confirmation, automatic refunds on cancellation, and per-hotel revenue reporting.
 
-✔ High-Concurrency Booking Workflows using Pessimistic Locking
-
-✔ Dynamic Pricing Engine using Strategy + Decorator Design Patterns
-
-✔ Stripe Payment Orchestration with Webhook-Driven Booking Confirmation
-
-✔ JWT-Based Authentication and Role-Based Authorization
-
-✔ PostgreSQL Optimization using JPQL Queries and Aggregations
-
-✔ Layered Spring Boot Architecture following Clean Separation of Concerns
+The interesting engineering is in three areas: **pessimistic database locking** to prevent double-booking, a **decorator-chain pricing engine** recalculated hourly by a batch scheduler, and a **two-token JWT strategy** (short-lived access + long-lived refresh stored in HttpOnly cookie).
 
 ---
 
-A **production-grade hospitality reservation** platform built using Spring Boot, designed to handle secure bookings, inventory management, dynamic pricing, payment processing, and hotel operations at scale.
-
-This project goes beyond a CRUD API. It implements **inventory management**, **pessimistic locking for concurrent bookings**, **Stripe checkout with webhook-driven confirmation**, and a **Strategy Pattern-based dynamic pricing engine** — the kind of patterns used in production booking systems.
-
-
-A **production-grade hospitality reservation** platform built using Spring Boot, designed to handle secure bookings, inventory management, dynamic pricing, payment processing, and hotel operations at scale.
-
-This project goes beyond a CRUD API. It implements **inventory management**, **pessimistic locking for concurrent bookings**, **Stripe checkout with webhook-driven confirmation**, and a **Strategy Pattern-based dynamic pricing engine** — the kind of patterns used in production booking systems.
-
----
-
-## 📊 System Scale & Engineering Considerations
-
-* 365-Day Inventory Pre-Generation for Every Room
-* Concurrent Booking Protection using Database-Level Pessimistic Locking
-* Hourly Dynamic Pricing Recalculation via Scheduled Batch Processing
-* Stripe Webhook-Driven Booking Confirmation Workflow
-* Multi-Role Access Control (Guest & Hotel Manager)
-* Aggregated Hotel Search Optimization using Precomputed Pricing Tables
-
-
-## 🏛 Enterprise Architecture
+## 🏗 Architecture
 
 ```
 src/main/java/com/codingshuttle/projects/airBnbApp/
 │
-├── advice/          → Unified API response wrapper + global exception handling
-├── config/          → CORS, ModelMapper, Stripe SDK configuration
-├── controller/      → REST controllers (Auth, Booking, Hotel, Inventory, Room, User, Webhook)
-├── dto/             → Request & response DTOs (clean separation from entities)
-├── entity/          → JPA entities (Booking, Hotel, Room, Inventory, Guest, User)
-│   └── enums/       → BookingStatus, PaymentStatus, Role, Gender
-├── exception/       → Custom exception classes
-├── repository/      → Spring Data JPA repositories with custom JPQL queries
-├── security/        → JWT filter, JWT service, auth service, security config
-├── service/         → Business logic (Booking, Hotel, Inventory, Room, User, Pricing)
-├── strategy/        → Dynamic pricing strategies (Decorator Pattern)
-└── util/            → AppUtils (SecurityContext helpers)
+├── advice/       → GlobalResponseHandler (ResponseBodyAdvice wraps all responses in ApiResponse<T>)
+│                   GlobalExceptionHandler (ResourceNotFound, Auth, JWT, AccessDenied → consistent ApiError)
+│
+├── config/       → CorsConfig (localhost:3000), MapperConfig (ModelMapper bean), StripeConfig (SDK init)
+│
+├── controller/   → AuthController, HotelBookingController, HotelBrowseController, HotelController (admin),
+│                   InventoryController (admin), RoomAdminController, UserController, WebhookController
+│
+├── dto/          → Request/response DTOs — entities never cross the service boundary
+│
+├── entity/       → Booking, Guest, Hotel, HotelContactInfo (@Embedded), HotelMinPrice,
+│                   Inventory (unique: hotel_id + room_id + date), Room, User (implements UserDetails)
+│   └── enums/    → BookingStatus, PaymentStatus, Role, Gender
+│
+├── exception/    → ResourceNotFoundException, UnAuthorisedException
+│
+├── repository/   → 8 repositories; InventoryRepository has 9 custom JPQL queries including
+│                   bulk UPDATE, pessimistic locking, and a CASE-based average price query
+│
+├── security/     → JWTService, JWTAuthFilter (OncePerRequestFilter), AuthService, WebSecurityConfig
+│
+├── service/      → BookingServiceImpl, CheckoutServiceImpl, GuestServiceImpl, HotelServiceImpl,
+│                   InventoryServiceImpl, PricingUpdateService (@Scheduled), RoomServiceImpl, UserServiceImpl
+│
+├── strategy/     → PricingStrategy interface + BasePricingStrategy, SurgePricingStrategy,
+│                   OccupancyPricingStrategy, UrgencyPricingStrategy, HolidayPricingStrategy (stub)
+│
+└── util/         → AppUtils.getCurrentUser() — pulls authenticated User from SecurityContextHolder
 ```
 
-The project follows **Controller → Service Interface → Service Impl → Repository** layering throughout, with DTOs used at every boundary and entities never leaking out of the service layer.
+The layering is strictly **Controller → Service Interface → ServiceImpl → Repository**. Every controller method delegates to an interface, keeping the controller layer free of business logic.
 
 ---
 
-## 🚀 Core Engineering Highlights
+## ✨ Features
 
-### 🔐 Security & Authentication
-- **JWT access + refresh token** strategy — short-lived access tokens (10 min), long-lived refresh tokens (6 months) stored as HttpOnly cookies
-- **Role-based authorization** via Spring Security: `GUEST` and `HOTEL_MANAGER` roles with endpoint-level restrictions
-- Password hashing with **BCrypt**
-- Custom `JWTAuthFilter` that delegates exception handling to Spring's `HandlerExceptionResolver` for consistent error responses
+### 🔐 Authentication & Security
+
+- **Two-token JWT strategy**: access token expires in 10 minutes; refresh token expires in 6 months. On login, both are issued — the access token is returned in the response body, the refresh token is written to an HttpOnly cookie.
+- **Stateless session**: Spring Security is configured with `SessionCreationPolicy.STATELESS`. No server-side session state at all.
+- **Token refresh**: `POST /auth/refresh` reads the cookie, validates the refresh token, and issues a new access token — no re-login required.
+- **`JWTAuthFilter`** is a `OncePerRequestFilter`. If JWT parsing throws a `JwtException`, it delegates to Spring's `HandlerExceptionResolver` so the error flows through `GlobalExceptionHandler` rather than bypassing it.
+- **BCrypt** password hashing via Spring Security's `PasswordEncoder`.
+- **Role-based endpoint protection** in `WebSecurityConfig`: `/admin/**` requires `HOTEL_MANAGER`, `/bookings/**` and `/users/**` require authentication, everything else (auth, browse) is public.
+- `User` implements `UserDetails` directly, so Spring Security's authentication pipeline works without a separate adapter.
 
 ### 🏨 Hotel & Room Management (Admin)
-- Full CRUD on hotels and rooms, **scoped to the authenticated hotel manager** — ownership is verified on every mutating operation
-- Hotel activation workflow: activating a hotel initializes a **365-day inventory** for every room
-- Rooms carry base price, capacity, total count, amenity metadata, and photo arrays
+
+- Full CRUD for hotels (`HotelController`) and rooms (`RoomAdminController`), both scoped to the authenticated hotel manager — ownership is verified with `user.equals(hotel.getOwner())` before every write.
+- **Hotel activation workflow**: calling `PATCH /admin/hotels/{id}/activate` sets `active = true` and triggers `inventoryService.initializeRoomForAYear()` for every room in the hotel. This seeds one `Inventory` row per day per room for the next 365 days, starting today.
+- Rooms hold `basePrice`, `capacity`, `totalCount`, photo URLs (`TEXT[]`), and amenities (`TEXT[]`).
+- Adding a new room to an already-active hotel also triggers inventory initialization for that room.
+- Deleting a hotel cascades: rooms' inventories are deleted first, then the rooms, then the hotel.
 
 ### 📦 Inventory System
-- Per-room, per-date inventory records tracking `totalCount`, `bookedCount`, `reservedCount`, `surgeFactor`, and `closed` status
-- **Pessimistic write locking** (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) on inventory reads during booking to prevent double-booking under concurrency
-- Bulk JPQL `UPDATE` queries for efficient inventory mutations (reserve → confirm → cancel)
-- Separate `HotelMinPrice` table for fast hotel-search queries (pre-computed cheapest price per hotel per day)
+
+The `Inventory` table is the core of the availability model. Each row represents **one room type, one day**, and tracks:
+
+| Field | Purpose |
+|---|---|
+| `totalCount` | Capacity set when room was created |
+| `bookedCount` | Rooms confirmed and paid |
+| `reservedCount` | Rooms held during active (not yet paid) bookings |
+| `surgeFactor` | Admin-settable multiplier, applied by `SurgePricingStrategy` |
+| `price` | Dynamically computed price, updated hourly by the scheduler |
+| `closed` | Admin can block availability for a date range |
+
+A **`UNIQUE` constraint** on `(hotel_id, room_id, date)` enforces one row per room per day at the database level.
+
+**Pessimistic write locking** (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) is applied at three points:
+1. `findAndLockAvailableInventory` — during booking initialization, locks the rows before checking availability and incrementing `reservedCount`
+2. `findAndLockReservedInventory` — during payment confirmation, locks before moving `reservedCount → bookedCount`; also called during cancellation to lock before decrementing `bookedCount`
+3. `getInventoryAndLockBeforeUpdate` — during admin inventory updates (surge factor / close flag), locks before the bulk UPDATE
+
+**Bulk JPQL `UPDATE` statements** avoid loading entities into memory for the three booking transitions:
+- `initBooking`: `reservedCount += numberOfRooms` (only if available)
+- `confirmBooking`: `reservedCount -= numberOfRooms`, `bookedCount += numberOfRooms`
+- `cancelBooking`: `bookedCount -= numberOfRooms`
+
+A separate `HotelMinPrice` table stores the cheapest room price per hotel per day, maintained by the scheduler. This lets hotel search queries hit a small aggregated table rather than joining across the full `Inventory` table.
 
 ### 🔍 Hotel Search
-- City + date range + room count search with pagination
-- Leverages the `HotelMinPrice` table with an aggregate JPQL query to return average price per hotel over the search window
-- Results mapped to `HotelPriceResponseDto` — no entity exposure
 
-### 📅 Booking Lifecycle
-The booking follows a well-defined state machine:
+`GET /hotels/search` accepts a `HotelSearchRequest` as `@RequestBody` (note: body on a GET — an intentional tradeoff for complex filter objects, acknowledged in [Design Decisions](#-design-decisions)).
+
+The search queries `HotelMinPriceRepository` with a JPQL aggregate:
+
+```sql
+SELECT new HotelPriceDto(i.hotel, AVG(i.price))
+FROM HotelMinPrice i
+WHERE i.hotel.city = :city
+  AND i.date BETWEEN :startDate AND :endDate
+  AND i.hotel.active = true
+GROUP BY i.hotel
+```
+
+Results are paginated (default page 0, size 10, configurable in the request DTO).
+
+> **Known gap**: the search query does not filter by `roomsCount` — hotels are returned based on pricing alone, not confirmed availability of the required number of rooms. A correct availability query exists in `InventoryRepository.findHotelsWithAvailableInventory()` but is not wired into the search path. See [Known Gaps](#-known-gaps).
+
+### 📅 Booking State Machine
 
 ```
-RESERVED → GUESTS_ADDED → PAYMENTS_PENDING → CONFIRMED
-                                           ↘ CANCELLED / EXPIRED
+RESERVED → GUESTS_ADDED → PAYMENTS_PENDING → CONFIRMED → CANCELLED
 ```
 
-- Booking is **reserved** (inventory locked) at initialization — expires in 10 minutes if not completed
-- Guests are attached from the user's saved guest list
-- Payment session is created via Stripe Checkout
-- Stripe **webhook** (`checkout.session.completed`) triggers the final inventory confirmation
-- Cancellation triggers an **automatic Stripe refund** via the Refund API
-
-### 💰 Dynamic Pricing Engine (Strategy + Decorator Pattern)
-
-The pricing pipeline chains four decorators over a base price:
-
-| Strategy | Trigger | Multiplier |
+| Transition | Triggered by | What happens |
 |---|---|---|
-| `BasePricingStrategy` | Always | Room base price |
-| `SurgePricingStrategy` | Admin-set surge factor | `× surgeFactor` |
-| `OccupancyPricingStrategy` | >80% rooms booked | `× 1.2` |
-| `UrgencyPricingStrategy` | Check-in within 7 days | `× 1.15` |
-| `HolidayPricingStrategy` | Holiday dates | `× 1.25` |
+| `→ RESERVED` | `POST /bookings/init` | Inventory locked + `reservedCount` incremented; booking amount calculated using current dynamic prices |
+| `→ GUESTS_ADDED` | `POST /bookings/{id}/addGuests` | Guest IDs validated against user's guest list and linked via `booking_guest` join table |
+| `→ PAYMENTS_PENDING` | `POST /bookings/{id}/payments` | Stripe Checkout Session created; session URL returned to frontend for redirect |
+| `→ CONFIRMED` | Stripe webhook `checkout.session.completed` | `reservedCount → bookedCount` in inventory; `paymentSessionId` persisted on booking |
+| `→ CANCELLED` | `POST /bookings/{id}/cancel` | Only confirmed bookings can be cancelled; `bookedCount` decremented; Stripe refund initiated automatically |
 
-Prices are recalculated **hourly** via a `@Scheduled` batch job (`PricingUpdateService`) that processes hotels in pages of 100 and bulk-upserts the `HotelMinPrice` table.
+**Expiry guard**: `hasBookingExpired()` checks `booking.createdAt + 10 minutes < now()`. This is enforced on `addGuests` and `initiatePayments` — if the booking is stale, an `IllegalStateException` is thrown. See [Known Gaps](#-known-gaps) for what this does and doesn't do.
+
+**Amount calculation**: booking price is computed at reservation time using `pricingService.calculateTotalPrice(inventoryList)`, which runs the full pricing pipeline over each day's inventory and sums the results. This amount is stored on the booking and passed to Stripe — so the price shown to the user reflects the dynamic price at the moment of reservation.
+
+### 💰 Dynamic Pricing Engine
+
+The pricing pipeline is implemented as a **Decorator chain** over a `PricingStrategy` interface. Each strategy wraps the one before it, so the execution order matters:
+
+```
+BasePricingStrategy
+  └── SurgePricingStrategy        (× surgeFactor, admin-settable per date range)
+        └── OccupancyPricingStrategy   (× 1.2 when bookedCount / totalCount > 0.8)
+              └── UrgencyPricingStrategy    (× 1.15 when check-in is within 7 days)
+                    └── HolidayPricingStrategy  (× 1.25 — stub, see below)
+```
+
+This follows the **Open/Closed Principle**: adding a new pricing rule means creating a new strategy class and inserting it into the chain — no existing strategy is modified.
+
+**`PricingUpdateService`** recalculates prices for every hotel every hour via `@Scheduled(cron = "0 0 * * * *")`. It processes hotels in pages of 100 to avoid loading everything into memory at once:
+1. For each hotel, fetches all inventory rows from today + 1 year
+2. Runs `calculateDynamicPricing()` on each row and saves all updated `Inventory` rows in bulk (`saveAll`)
+3. Groups updated inventory prices by date, takes the minimum per day, and bulk-upserts `HotelMinPrice`
+
+> **Holiday strategy**: `HolidayPricingStrategy` always applies the 1.25× multiplier because `isTodayHoliday` is hardcoded to `true` (pending integration with a holiday calendar API). This means all prices currently include the holiday markup every day. This is a known stub — see [Known Gaps](#-known-gaps).
 
 ### 💳 Stripe Payment Integration
-- Stripe Checkout Session created per booking with customer creation, line item, billing address collection
-- Session URL returned to frontend for redirect
-- Webhook validates `Stripe-Signature` header before processing events
-- On `checkout.session.completed`: booking confirmed + inventory moved from `reserved` to `booked`
-- On cancellation: `Session.retrieve()` + `Refund.create()` for automated refunds
 
-### 🧾 Reporting (Admin)
-- Per-hotel booking report with configurable date range
-- Aggregates: total confirmed bookings, total revenue, average revenue per booking
+`CheckoutServiceImpl.getCheckoutSession()`:
+1. Creates a Stripe `Customer` with the user's name and email
+2. Creates a `Session` in `PAYMENT` mode with billing address collection required
+3. Sets line item: quantity 1, currency INR, unit amount = `booking.amount × 100` (paise)
+4. Line item name = `{hotelName} : {roomType}`, description = `Booking ID: {id}`
+5. Both success and cancel URLs point to `{frontendUrl}/payments/{bookingId}/status`
+6. Saves the session ID on the booking before returning the session URL
 
-### 🔁 Global API Consistency
-- `GlobalResponseHandler` wraps all successful responses in `ApiResponse<T>` (with timestamp)
-- `GlobalExceptionHandler` maps custom and Spring exceptions to consistent `ApiError` payloads
-- Swagger/OpenAPI annotations on every endpoint for documentation
+`WebhookController.capturePayments()`:
+- Validates the `Stripe-Signature` header via `Webhook.constructEvent(payload, sigHeader, endpointSecret)`
+- On `checkout.session.completed`: confirms booking, promotes inventory from reserved → booked
+- Unhandled event types are logged as `WARN` but not errored (deliberate — graceful degradation)
+
+`cancelBooking()` (service layer):
+- Only `CONFIRMED` bookings can be cancelled
+- Calls `Session.retrieve(paymentSessionId)` then `Refund.create()` with the session's `paymentIntent`
+- Inventory `bookedCount` is decremented
+
+### 🧾 Revenue Reporting (Admin)
+
+`GET /admin/hotels/{id}/reports?startDate=&endDate=` (defaults: last 30 days if not provided) returns:
+
+```json
+{
+  "bookingCount": 14,
+  "totalRevenue": 182000.00,
+  "avgRevenue": 13000.00
+}
+```
+
+Only `CONFIRMED` bookings are counted. Revenue is calculated in-memory by streaming the booking list — no aggregate SQL query. `avgRevenue` uses `RoundingMode.HALF_UP`.
+
+### 🔁 Global API Envelope
+
+`GlobalResponseHandler` implements `ResponseBodyAdvice<Object>` and wraps every response body in `ApiResponse<T>` unless the route contains `/v3/api-docs` or `/actuator`. This means all API responses share the same shape:
+
+```json
+{
+  "timeStamp": "2024-11-01T10:30:00",
+  "data": { ... },
+  "error": null
+}
+```
+
+`GlobalExceptionHandler` maps four exception types:
+| Exception | HTTP Status |
+|---|---|
+| `ResourceNotFoundException` | 404 |
+| `AuthenticationException` | 401 |
+| `JwtException` | 401 |
+| `AccessDeniedException` | 403 |
+
+The generic `Exception` handler is present in the code but **commented out** — uncaught exceptions will produce Spring's default error response rather than an `ApiError`. See [Known Gaps](#-known-gaps).
 
 ---
 
-## ⚙ Technology Stack
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -169,58 +247,70 @@ Prices are recalculated **hourly** via a `@Scheduled` batch job (`PricingUpdateS
 | Payments | Stripe Java SDK |
 | Mapping | ModelMapper |
 | Build | Maven |
-| API Docs | SpringDoc OpenAPI (Swagger UI) |
+| API Docs | SpringDoc OpenAPI (`@Operation` annotations on every endpoint) |
 
 ---
 
-## 🌐 API Surface
+## 🌐 API Reference
 
 All endpoints are prefixed with `/api/v1`.
 
 ### Auth
-| Method | Endpoint | Description | Access |
+| Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/signup` | Register a new user | Public |
-| `POST` | `/auth/login` | Login, returns access token + sets refresh cookie | Public |
-| `POST` | `/auth/refresh` | Refresh access token using cookie | Public |
+| `POST` | `/auth/signup` | Public | Register; new users get `GUEST` role |
+| `POST` | `/auth/login` | Public | Returns `accessToken` in body; `refreshToken` in HttpOnly cookie |
+| `POST` | `/auth/refresh` | Cookie | Issues new access token from refresh cookie |
 
 ### Browse (Public)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/hotels/search` | Search hotels by city, dates, room count (paginated) |
-| `GET` | `/hotels/{hotelId}/info` | Get hotel details with room prices for a date range |
+| `GET` | `/hotels/search` | Search by city + date range + room count (body, paginated) |
+| `GET` | `/hotels/{hotelId}/info` | Hotel detail with per-room average price for a date range |
 
-### Booking (Authenticated)
+### Booking (Authenticated Guest)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/bookings/init` | Initialize a booking (reserves inventory) |
-| `POST` | `/bookings/{id}/addGuests` | Attach guests to booking |
-| `POST` | `/bookings/{id}/payments` | Create Stripe Checkout session |
+| `POST` | `/bookings/init` | Reserve rooms; locks inventory, calculates price |
+| `POST` | `/bookings/{id}/addGuests` | Attach guest IDs (must be in user's guest list) |
+| `POST` | `/bookings/{id}/payments` | Create Stripe session; returns redirect URL |
 | `GET` | `/bookings/{id}/status` | Poll booking status |
-| `POST` | `/bookings/{id}/cancel` | Cancel booking + trigger refund |
+| `POST` | `/bookings/{id}/cancel` | Cancel + automatic Stripe refund (CONFIRMED only) |
 
-### User Profile (Authenticated)
+### User & Guests (Authenticated)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/users/profile` | Get current user profile |
+| `GET` | `/users/profile` | Get own profile |
 | `PATCH` | `/users/profile` | Update name, DOB, gender |
-| `GET` | `/users/myBookings` | Get booking history |
-| `GET/POST/PUT/DELETE` | `/users/guests` | Manage saved guest profiles |
+| `GET` | `/users/myBookings` | All bookings for current user |
+| `GET` | `/users/guests` | List saved guests |
+| `POST` | `/users/guests` | Add a guest |
+| `PUT` | `/users/guests/{id}` | Update a guest |
+| `DELETE` | `/users/guests/{id}` | Remove a guest |
 
-### Admin — Hotel Manager Only
+### Admin — Hotel Manager Only (`HOTEL_MANAGER` role)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET/POST/PUT/DELETE` | `/admin/hotels` | Hotel management |
-| `PATCH` | `/admin/hotels/{id}/activate` | Activate hotel (seeds 1-year inventory) |
-| `GET/POST/PUT/DELETE` | `/admin/hotels/{id}/rooms` | Room management |
-| `GET/PATCH` | `/admin/inventory/rooms/{roomId}` | View and update room inventory |
+| `POST` | `/admin/hotels` | Create hotel (inactive by default) |
+| `GET` | `/admin/hotels` | All hotels owned by current manager |
+| `GET` | `/admin/hotels/{id}` | Get hotel by ID |
+| `PUT` | `/admin/hotels/{id}` | Update hotel |
+| `DELETE` | `/admin/hotels/{id}` | Delete hotel + rooms + inventories |
+| `PATCH` | `/admin/hotels/{id}/activate` | Activate + seed 365-day inventory |
+| `POST` | `/admin/hotels/{id}/rooms` | Add room |
+| `GET` | `/admin/hotels/{id}/rooms` | List rooms |
+| `GET` | `/admin/hotels/{id}/rooms/{roomId}` | Get room |
+| `PUT` | `/admin/hotels/{id}/rooms/{roomId}` | Update room |
+| `DELETE` | `/admin/hotels/{id}/rooms/{roomId}` | Delete room + inventories |
+| `GET` | `/admin/inventory/rooms/{roomId}` | View all inventory for a room |
+| `PATCH` | `/admin/inventory/rooms/{roomId}` | Update surge factor + closed status for a date range |
 | `GET` | `/admin/hotels/{id}/bookings` | All bookings for a hotel |
-| `GET` | `/admin/hotels/{id}/reports` | Revenue report with date range |
+| `GET` | `/admin/hotels/{id}/reports` | Revenue report (optional date range, defaults to last 30 days) |
 
 ### Webhook
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/webhook/payment` | Stripe webhook receiver (signature-verified) |
+| `POST` | `/webhook/payment` | Stripe webhook; validates `Stripe-Signature` header |
 
 ---
 
@@ -230,42 +320,40 @@ All endpoints are prefixed with `/api/v1`.
 - Java 17+
 - Maven 3.6+
 - PostgreSQL 14+
-- A [Stripe](https://stripe.com) test account
+- Stripe test account
 
-### 1. Clone & Configure
+### 1. Clone
 
 ```bash
 git clone https://github.com/sushant-gargi/stayease.git
 cd stayease
 ```
 
-Create `src/main/resources/application.properties`:
+### 2. Configure
+
+Create `src/main/resources/application.properties` (the committed file contains test credentials — replace everything):
 
 ```properties
 spring.application.name=StayEase
 
-# Database
-spring.datasource.url=jdbc:postgresql://localhost:5432/airbnb
+spring.datasource.url=jdbc:postgresql://localhost:5432/stayease
 spring.datasource.username=YOUR_DB_USERNAME
 spring.datasource.password=YOUR_DB_PASSWORD
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
 
-# Server
 server.servlet.context-path=/api/v1
 
-# JWT — use a strong secret (min 256-bit)
-jwt.secretKey=YOUR_JWT_SECRET_KEY_AT_LEAST_32_CHARS
+# Min 32 characters, high entropy
+jwt.secretKey=YOUR_STRONG_JWT_SECRET_KEY_HERE
 
-# Frontend (for Stripe redirect URLs)
+# For Stripe redirect URLs after payment
 frontend.url=http://localhost:3000
 
-# Stripe
 stripe.secret.key=${STRIPE_SECRET_KEY}
 stripe.webhook.secret=${STRIPE_WEBHOOK_SECRET}
 ```
-
-### 2. Set Environment Variables
 
 ```bash
 export STRIPE_SECRET_KEY=sk_test_...
@@ -278,62 +366,71 @@ export STRIPE_WEBHOOK_SECRET=whsec_...
 ./mvnw spring-boot:run
 ```
 
-API is available at `http://localhost:8080/api/v1`
-Swagger UI at `http://localhost:8080/api/v1/swagger-ui.html`
+- API: `http://localhost:8080/api/v1`
+- Swagger UI: `http://localhost:8080/api/v1/swagger-ui.html`
 
-### 4. Set Up Stripe Webhook (Local Testing)
+### 4. Test Stripe Webhooks Locally
 
 ```bash
-# Install Stripe CLI
 stripe listen --forward-to localhost:8080/api/v1/webhook/payment
 ```
 
+Copy the webhook signing secret printed by the CLI into `STRIPE_WEBHOOK_SECRET`.
+
 ---
 
-## ⚡ Engineering Highlights
+## 🧠 Design Decisions
 
-### Pessimistic Locking for Concurrent Bookings
-Two users booking the same room simultaneously is handled with `PESSIMISTIC_WRITE` locks on the inventory rows during the booking transaction. The `initBooking` query atomically increments `reservedCount` only when availability checks pass — eliminating race conditions without application-level distributed locks.
+**`GET /hotels/search` uses `@RequestBody` instead of query parameters.** A search with city, start date, end date, room count, page, and size is unwieldy as a query string. Using a request body allows a structured DTO. The tradeoff is that GET-with-body is technically non-standard (some proxies strip it). A production alternative would be `POST /hotels/search` or Spring's `@ParameterObject` with `Pageable`.
 
-### Decorator Pattern Pricing Engine
-The pricing system uses composable decorators so new pricing rules can be added without touching existing code (Open/Closed Principle). The `PricingUpdateService` runs every hour and updates both `Inventory` prices and the `HotelMinPrice` summary table in a single batch pass.
+**`HotelMinPrice` as a pre-computed search index.** Rather than joining `Inventory` across hundreds of rows for every search request, a scheduled job maintains a summary table with the minimum price per hotel per day. Search queries hit this small table with a simple GROUP BY. The cost is eventual consistency — prices in search results reflect the last hourly batch run, not real-time inventory.
 
-### Booking Expiry
-Bookings that aren't paid within 10 minutes are considered expired (`hasBookingExpired()` check). Inventory reservation is held for this window, then released — keeping the system consistent without requiring a separate cleanup scheduler.
+**Pessimistic locking over optimistic locking.** The booking window is short (10 minutes). Under contention, `PESSIMISTIC_WRITE` locks rows for the duration of the transaction rather than relying on version-based retry loops. This is simpler to reason about for a booking system where the user-facing failure ("room no longer available") is acceptable but silent data corruption (double-booking) is not.
 
-### Consistent API Layer
-Every response, success or error, is wrapped in `ApiResponse<T>` via a `ResponseBodyAdvice` interceptor. This means frontend clients always receive the same envelope format, including timestamps.
+**Decorator pattern for pricing strategies.** Each pricing rule is encapsulated in its own class, wrapping the previous one. New rules can be added by creating a new strategy class and inserting it into the chain in `PricingService.calculateDynamicPricing()` — no existing code changes. This also makes unit testing individual rules straightforward since each strategy only needs a mock of the inner one.
+
+**Price locked at reservation, not payment.** `booking.amount` is set at `initBooking` time using the current dynamic prices. This amount is what gets passed to Stripe. The user pays the price they saw when they initiated the booking, even if the hourly recalculation runs between reservation and payment.
+
+**Inventory seeded per-save, not in bulk.** `initializeRoomForAYear()` calls `inventoryRepository.save()` in a loop (366 iterations). A `saveAll()` would be more efficient. This is a known performance gap noted for future improvement.
+
+---
+
+## ⚠️ Known Gaps
+
+These are real limitations in the current implementation, documented honestly:
+
+**Booking expiry does not free inventory.** `hasBookingExpired()` only throws an exception when the user tries to act on an expired booking — it does not run proactively. A booking that expires without user action stays in `RESERVED` status and permanently holds `reservedCount`. To fix this properly, a scheduled job would need to scan for bookings older than 10 minutes in `RESERVED` or `GUESTS_ADDED` status, set them to `EXPIRED`, and call `cancelReservation` on their inventory. The `EXPIRED` enum value exists but is never set in any code path.
+
+**Hotel search does not filter by room availability.** The `HotelMinPriceRepository` search query filters by city, date range, and active status — but does not check whether rooms with the requested capacity are actually available. `roomsCount` is passed as a parameter but is unused in the JPQL WHERE clause. A complete availability check query does exist in `InventoryRepository.findHotelsWithAvailableInventory()` but is not wired into the active search path. As a result, search results reflect pricing but not guaranteed availability.
+
+**Holiday pricing is a stub.** `HolidayPricingStrategy` hardcodes `isTodayHoliday = true`, meaning the 1.25× holiday multiplier is applied to every price every day. This is intentional scaffolding for future integration with a holiday calendar API or local date database, but means current prices are 25% higher than the base+surge+occupancy+urgency calculation would suggest.
+
+**Generic exception handler is commented out.** `handleInternalServerError` in `GlobalExceptionHandler` is disabled. Uncaught runtime exceptions (e.g., null pointer, `StripeException` wrapped as `RuntimeException`) will produce Spring Boot's default error response instead of a consistent `ApiError` envelope.
+
+**Stripe currency is hardcoded to INR.** The Stripe session creation passes `currency = "inr"` directly. This is not configurable.
+
+**CORS is hardcoded to `localhost:3000`.** `CorsConfig` allows only `http://localhost:3000`. Any other frontend origin will be blocked.
+
+**Inventory initialization is N+1 saves.** `initializeRoomForAYear()` calls `save()` 366 times in a loop rather than `saveAll()` once.
 
 ---
 
 ## 🗄 Domain Model
 
 ```
-User ──< Booking >── Hotel
-              │
-             Room
-              │
-          Inventory (hotel_id, room_id, date) — UNIQUE constraint
-              │
-          HotelMinPrice (hotel_id, date)
+User (app_user)
+ ├──< Hotel (owner → User)
+ │     └──< Room
+ │           ├──< Inventory [hotel_id, room_id, date — UNIQUE]
+ │           └── HotelMinPrice [hotel_id, date]
+ └──< Booking (user, hotel, room)
+       └──< Guest (via booking_guest join table)
 ```
 
-`User` implements Spring Security's `UserDetails`, allowing direct use with the security context throughout the codebase.
-
----
-
-## 🎯 Production Engineering Concepts Demonstrated
-
-- Designing a **multi-role REST API** with fine-grained authorization
-- Implementing **pessimistic database locking** for high-concurrency scenarios
-- Building a **composable pricing engine** using the Strategy + Decorator patterns
-- Integrating **Stripe Checkout** with webhook-driven state transitions
-- Using **Spring Scheduling** for background batch processing
-- Writing **custom JPQL queries** for aggregate operations (avg price, revenue reports)
-- Structuring a Spring Boot project with clean layering and consistent error handling
+`User` implements `UserDetails` (Spring Security) and overrides `equals/hashCode` on ID, making ownership checks (`user.equals(hotel.getOwner())`) safe and consistent throughout the codebase.
 
 ---
 
 ## 📄 License
 
-This project is built for **learning and portfolio purposes**. Feel free to explore, fork, or use it as a reference.
+Built for learning and portfolio purposes. Free to explore, fork, or use as reference.
