@@ -395,26 +395,6 @@ Copy the webhook signing secret printed by the CLI into `STRIPE_WEBHOOK_SECRET`.
 
 ---
 
-## ⚠️ Known Gaps
-
-These are real limitations in the current implementation, documented honestly:
-
-**Booking expiry does not free inventory.** `hasBookingExpired()` only throws an exception when the user tries to act on an expired booking — it does not run proactively. A booking that expires without user action stays in `RESERVED` status and permanently holds `reservedCount`. To fix this properly, a scheduled job would need to scan for bookings older than 10 minutes in `RESERVED` or `GUESTS_ADDED` status, set them to `EXPIRED`, and call `cancelReservation` on their inventory. The `EXPIRED` enum value exists but is never set in any code path.
-
-**Hotel search does not filter by room availability.** The `HotelMinPriceRepository` search query filters by city, date range, and active status — but does not check whether rooms with the requested capacity are actually available. `roomsCount` is passed as a parameter but is unused in the JPQL WHERE clause. A complete availability check query does exist in `InventoryRepository.findHotelsWithAvailableInventory()` but is not wired into the active search path. As a result, search results reflect pricing but not guaranteed availability.
-
-**Holiday pricing is a stub.** `HolidayPricingStrategy` hardcodes `isTodayHoliday = true`, meaning the 1.25× holiday multiplier is applied to every price every day. This is intentional scaffolding for future integration with a holiday calendar API or local date database, but means current prices are 25% higher than the base+surge+occupancy+urgency calculation would suggest.
-
-**Generic exception handler is commented out.** `handleInternalServerError` in `GlobalExceptionHandler` is disabled. Uncaught runtime exceptions (e.g., null pointer, `StripeException` wrapped as `RuntimeException`) will produce Spring Boot's default error response instead of a consistent `ApiError` envelope.
-
-**Stripe currency is hardcoded to INR.** The Stripe session creation passes `currency = "inr"` directly. This is not configurable.
-
-**CORS is hardcoded to `localhost:3000`.** `CorsConfig` allows only `http://localhost:3000`. Any other frontend origin will be blocked.
-
-**Inventory initialization is N+1 saves.** `initializeRoomForAYear()` calls `save()` 366 times in a loop rather than `saveAll()` once.
-
----
-
 ## 🗄 Domain Model
 
 ```
